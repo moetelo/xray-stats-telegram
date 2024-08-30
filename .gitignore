@@ -1,0 +1,11 @@
+# Test binary, built with `go test -c`
+*.test
+
+# Go workspace file
+go.work
+
+.vscode
+
+xray-stats-telegram
+/users.json
+.env
