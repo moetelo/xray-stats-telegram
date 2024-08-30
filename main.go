@@ -54,8 +54,8 @@ func main() {
 
 	opts := []bot.Option{
 		bot.WithDefaultHandler(defaultHandler),
-		bot.WithMessageTextHandler("/all", bot.MatchTypeExact, allHandler),
-		bot.WithMessageTextHandler("/stats", bot.MatchTypeExact, statsHandler),
+		bot.WithMessageTextHandler("/all", bot.MatchTypePrefix, allHandler),
+		bot.WithMessageTextHandler("/stats", bot.MatchTypePrefix, statsHandler),
 	}
 
 	b, err := bot.New(os.Getenv("BOT_TOKEN"), opts...)
