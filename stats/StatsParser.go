@@ -43,7 +43,7 @@ func (parser *StatsParser) sumLines(file string) int {
 	return sum
 }
 
-func (parser *StatsParser) GetToday(user string) *Stats {
+func (parser StatsParser) GetToday(user string) *Stats {
 	today := time.Now().Format(time.DateOnly)
 
 	path := fmt.Sprintf("%s/%s/down/%s", parser.TrafficDataDirectory, user, today)

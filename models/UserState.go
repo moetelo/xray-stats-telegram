@@ -12,17 +12,17 @@ type UserState struct {
 	tgIdToXrayEmail *map[int64]string
 }
 
-func (m *UserState) IsAdmin(id int64) bool {
+func (m UserState) IsAdmin(id int64) bool {
 	_, ok := (*m.admins)[id]
 	return ok
 }
 
-func (m *UserState) GetXrayEmail(id int64) (string, bool) {
+func (m UserState) GetXrayEmail(id int64) (string, bool) {
 	email, ok := (*m.tgIdToXrayEmail)[id]
 	return email, ok
 }
 
-func (m *UserState) GetAllUsers() *[]string {
+func (m UserState) GetAllUsers() *[]string {
 	return internal.Values(m.tgIdToXrayEmail)
 }
 
