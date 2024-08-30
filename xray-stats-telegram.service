@@ -1,0 +1,13 @@
+[Unit]
+Description=Xray Stats Telegram Service
+After=network.target
+
+[Install]
+WantedBy=multi-user.target
+
+[Service]
+ExecStart=/usr/local/bin/xray-stats-telegram --traffic-data <traffic-data-dir> --users-json <users-json>
+Restart=always
+User=nobody
+Group=nogroup
+Environment=BOT_TOKEN=<bot-token>
