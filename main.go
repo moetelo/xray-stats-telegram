@@ -91,13 +91,25 @@ func allHandler(ctx context.Context, b *bot.Bot, update *tgModels.Update) {
 
 	allUserEmails := userState.GetAllUsers()
 
-	var builder strings.Builder
-	builder.WriteString("Today:\n")
-
+	userStatsSorted := make([]stats.Stats, 0, len(*allUserEmails))
+	emptyStatsUsers := make([]string, 0)
 	for _, xrayUser := range *allUserEmails {
 		stats := statsParser.GetToday(xrayUser)
-		fmt.Fprintf(&builder, "%s\n%s\n\n", xrayUser, stats.ToOneLineString())
+
+		if stats.Down == 0 && stats.Up == 0 {
+			emptyStatsUsers = append(emptyStatsUsers, stats.User)
+			continue
+		}
+
+		userStatsSorted = append(userStatsSorted, *stats)
 	}
+
+	var builder strings.Builder
+	for _, stats := range userStatsSorted {
+		fmt.Fprintf(&builder, "%s\n%s\n\n", stats.User, stats.ToOneLineString())
+	}
+
+	fmt.Fprintln(&builder, "Empty stats users:", strings.Join(emptyStatsUsers, ", "))
 
 	b.SendMessage(ctx, &bot.SendMessageParams{
 		ChatID: update.Message.Chat.ID,
@@ -114,10 +126,9 @@ func statsHandler(ctx context.Context, b *bot.Bot, update *tgModels.Update) {
 	}
 
 	stats := statsParser.GetToday(xrayUser)
-	text := "Today:\n" + stats.ToString()
 
 	b.SendMessage(ctx, &bot.SendMessageParams{
 		ChatID: update.Message.Chat.ID,
-		Text:   text,
+		Text:   stats.ToString(),
 	})
 }

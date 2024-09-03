@@ -19,6 +19,7 @@ func New(trafficDataDirectory string) *StatsParser {
 }
 
 type Stats struct {
+	User string
 	Down int
 	Up   int
 }
@@ -48,7 +49,9 @@ func (parser StatsParser) GetToday(user string) *Stats {
 
 	path := fmt.Sprintf("%s/%s/down/%s", parser.TrafficDataDirectory, user, today)
 
-	var stats Stats
+	stats := Stats{
+		User: user,
+	}
 
 	file, err := os.ReadFile(path)
 	if err == nil {
