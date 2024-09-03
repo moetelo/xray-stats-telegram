@@ -6,7 +6,7 @@ After=network.target
 WantedBy=multi-user.target
 
 [Service]
-ExecStart=/usr/local/bin/xray-stats-telegram --traffic-data <traffic-data-dir> --users-json <users-json>
+ExecStart=/usr/local/bin/xray-stats-telegram
 Restart=always
 User=nobody
 Group=nogroup

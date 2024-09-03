@@ -1,11 +1,11 @@
 package models
 
-import "xray-stats-telegram/internal"
-
-type UsersJson struct {
-	Admins                *[]int64          `json:"admins,omitempty"`
-	TelegramIdToXrayEmail *map[int64]string `json:"usersToXrayEmail,omitempty"`
-}
+import (
+	"os"
+	"strconv"
+	"strings"
+	"xray-stats-telegram/internal"
+)
 
 type UserState struct {
 	admins          *Set[int64]
@@ -26,14 +26,47 @@ func (m UserState) GetAllUsers() *[]string {
 	return internal.Values(m.tgIdToXrayEmail)
 }
 
-func NewState(m *UsersJson) *UserState {
+func NewState(adminsSlice *[]int64, telegramIdToXrayEmail *map[int64]string) *UserState {
 	admins := make(Set[int64])
-	for _, admin := range *m.Admins {
+	for _, admin := range *adminsSlice {
 		admins[admin] = struct{}{}
 	}
 
 	return &UserState{
 		admins:          &admins,
-		tgIdToXrayEmail: m.TelegramIdToXrayEmail,
+		tgIdToXrayEmail: telegramIdToXrayEmail,
+	}
+}
+
+func NewStateFromConfigs(adminsPath, usersPath string) *UserState {
+	adminsFile, err := os.ReadFile(adminsPath)
+	admins := make(Set[int64])
+	if err == nil {
+		for _, line := range strings.Split(string(adminsFile), "\n") {
+			adminId, _ := strconv.ParseInt(line, 10, 64)
+			admins[adminId] = struct{}{}
+		}
+	}
+
+	usersFile, err := os.ReadFile(usersPath)
+	if err != nil {
+		panic(err)
+	}
+
+	telegramIdToXrayEmail := make(map[int64]string)
+	for _, line := range strings.Split(string(usersFile), "\n") {
+		if len(line) == 0 {
+			continue
+		}
+
+		idEmail := strings.Split(line, ":")
+
+		id, _ := strconv.ParseInt(idEmail[0], 10, 64)
+		telegramIdToXrayEmail[id] = idEmail[1]
+	}
+
+	return &UserState{
+		admins:          &admins,
+		tgIdToXrayEmail: &telegramIdToXrayEmail,
 	}
 }
