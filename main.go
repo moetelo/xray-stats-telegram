@@ -4,7 +4,6 @@ import (
 	"context"
 	"fmt"
 	"log"
-	"net/http"
 	"os"
 	"os/signal"
 	"strings"
@@ -20,7 +19,6 @@ import (
 )
 
 type Args struct {
-	Port                 int    `arg:"-p,--port" help:"Port to listen on"`
 	UsersJsonPath        string `arg:"-u,--users-json,required" help:"Path to the users.json file"`
 	TrafficDataDirectory string `arg:"-t,--traffic-data,required" help:"Path to the traffic data directory"`
 }
@@ -61,33 +59,6 @@ func main() {
 	b, err := bot.New(os.Getenv("BOT_TOKEN"), opts...)
 	if err != nil {
 		panic(err)
-	}
-
-	if args.Port != 0 {
-		stop := make(chan os.Signal, 1)
-		signal.Notify(stop, os.Interrupt)
-
-		go b.StartWebhook(ctx)
-		srv := &http.Server{
-			Addr:    fmt.Sprintf(":%d", args.Port),
-			Handler: b.WebhookHandler(),
-		}
-
-		go func() {
-			fmt.Println("[xray-stats-telegram] Started a webhook...")
-			err := srv.ListenAndServe()
-			if err != http.ErrServerClosed {
-				panic(err)
-			}
-
-			fmt.Println("[xray-stats-telegram] Webhook server stopped gracefully")
-		}()
-
-		<-stop
-		if err := srv.Shutdown(ctx); err != nil {
-			panic(err)
-		}
-		return
 	}
 
 	fmt.Println("[xray-stats-telegram] Polling for messages...")
