@@ -10,4 +10,4 @@ ExecStart=/usr/local/bin/xray-stats-telegram
 Restart=always
 User=nobody
 Group=nogroup
-Environment=BOT_TOKEN=<bot-token>
+Environment=TELOXIDE_TOKEN=<bot-token>

@@ -8,7 +8,8 @@ if [ -z "$botToken" ]; then
     exit 1
 fi
 
-go build -o /usr/local/bin/xray-stats-telegram
+cargo build --release
+cp ./target/release/xray-stats-telegram-rs /usr/local/bin/xray-stats-telegram
 
 sed "s|<bot-token>|$botToken|" xray-stats-telegram.service \
     > /etc/systemd/system/xray-stats-telegram.service
