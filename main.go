@@ -20,6 +20,11 @@ var userState *models.UserState
 
 var statsParser *stats.StatsParser
 
+const (
+	CommandAll   = "/all"
+	CommandQuery = "/query"
+)
+
 func main() {
 	godotenv.Load()
 
@@ -28,25 +33,22 @@ func main() {
 		log.Fatalln("env var BOT_TOKEN is not set. Use .env file or env var.")
 	}
 
+	statsQueryBin := os.Getenv("STATS_QUERY_BIN")
+	statsParser = stats.New(statsQueryBin)
+
 	userState = models.NewStateFromConfigs(
 		"/usr/local/etc/xray-stats-telegram/admins",
 		"/usr/local/etc/xray-stats-telegram/users",
 	)
-
-	trafficDataDirectory, err := os.ReadFile("/usr/local/etc/xray-stats/directory")
-	if err != nil {
-		panic(err)
-	}
-
-	statsParser = stats.New(strings.TrimSpace(string(trafficDataDirectory)))
 
 	ctx, cancel := signal.NotifyContext(context.Background(), os.Interrupt)
 	defer cancel()
 
 	opts := []bot.Option{
 		bot.WithDefaultHandler(defaultHandler),
-		bot.WithMessageTextHandler("/all", bot.MatchTypePrefix, allHandler),
-		bot.WithMessageTextHandler("/stats", bot.MatchTypePrefix, statsHandler),
+		bot.WithMessageTextHandler(CommandAll, bot.MatchTypePrefix, allHandler),
+		bot.WithMessageTextHandler(CommandQuery, bot.MatchTypePrefix, queryHandler),
+		bot.WithAllowedUpdates([]string{"message"}),
 	}
 
 	b, err := bot.New(botToken, opts...)
@@ -60,24 +62,22 @@ func main() {
 
 func defaultHandler(ctx context.Context, b *bot.Bot, update *tgModels.Update) {
 	userId := update.Message.From.ID
-	isAdmin := userState.IsAdmin(userId)
-	_, isXrayUser := userState.GetXrayEmail(userId)
-
-	if isAdmin {
+	if userState.IsAdmin(userId) {
 		b.SendMessage(ctx, &bot.SendMessageParams{
 			ChatID: update.Message.Chat.ID,
-			Text:   "Commands:\n/stats\n/all",
+			Text:   "Command:\n" + CommandAll + "\n" + CommandQuery,
 		})
 		return
 	}
 
+	_, isXrayUser := userState.GetXrayEmail(userId)
 	if !isXrayUser {
 		return
 	}
 
 	b.SendMessage(ctx, &bot.SendMessageParams{
 		ChatID: update.Message.Chat.ID,
-		Text:   "Command:\n/stats",
+		Text:   "Command:\n" + CommandQuery,
 	})
 }
 
@@ -91,10 +91,10 @@ func allHandler(ctx context.Context, b *bot.Bot, update *tgModels.Update) {
 
 	allUserEmails := userState.GetAllUsers()
 
-	userStatsSorted := make([]stats.Stats, 0, len(*allUserEmails))
+	userStatsSorted := make([]stats.Stats, 0, len(allUserEmails))
 	emptyStatsUsers := make([]string, 0)
-	for _, xrayUser := range *allUserEmails {
-		stats := statsParser.GetToday(xrayUser)
+	for _, xrayUser := range allUserEmails {
+		stats := statsParser.Query(xrayUser, nil)
 
 		if stats.Down == 0 && stats.Up == 0 {
 			emptyStatsUsers = append(emptyStatsUsers, stats.User)
@@ -117,15 +117,13 @@ func allHandler(ctx context.Context, b *bot.Bot, update *tgModels.Update) {
 	})
 }
 
-func statsHandler(ctx context.Context, b *bot.Bot, update *tgModels.Update) {
-	userId := update.Message.From.ID
-	xrayUser, isXrayUser := userState.GetXrayEmail(userId)
-
+func queryHandler(ctx context.Context, b *bot.Bot, update *tgModels.Update) {
+	xrayUser, isXrayUser := userState.GetXrayEmail(update.Message.From.ID)
 	if !isXrayUser {
 		return
 	}
 
-	stats := statsParser.GetToday(xrayUser)
+	stats := statsParser.Query(xrayUser, nil)
 
 	b.SendMessage(ctx, &bot.SendMessageParams{
 		ChatID: update.Message.Chat.ID,

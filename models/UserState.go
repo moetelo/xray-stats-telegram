@@ -22,7 +22,7 @@ func (m UserState) GetXrayEmail(id int64) (string, bool) {
 	return email, ok
 }
 
-func (m UserState) GetAllUsers() *[]string {
+func (m UserState) GetAllUsers() []string {
 	return internal.Values(m.tgIdToXrayEmail)
 }
 
