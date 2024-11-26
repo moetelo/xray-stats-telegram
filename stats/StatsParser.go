@@ -6,17 +6,11 @@ import (
 	"os/exec"
 	"strconv"
 	"strings"
-	"sync"
 	"time"
 )
 
 type StatsParser struct {
 	statsQueryBin string
-
-	dateToUserToStats      map[string]map[string]*Stats
-	lastQueryExecutionTime time.Time
-
-	mu sync.Mutex
 }
 
 func New(statsQueryBin string) *StatsParser {
@@ -25,23 +19,12 @@ func New(statsQueryBin string) *StatsParser {
 	}
 
 	return &StatsParser{
-		statsQueryBin:          statsQueryBin,
-		dateToUserToStats:      make(map[string]map[string]*Stats),
-		lastQueryExecutionTime: time.Time{},
+		statsQueryBin: statsQueryBin,
 	}
 }
 
-func (parser *StatsParser) Query(user string, byDate *time.Time) *Stats {
+func (parser *StatsParser) Query(user string, byDate time.Time) *Stats {
 	dateOnly := byDate.Format(time.DateOnly)
-
-	if parser.shouldInvalidateCache(dateOnly) {
-		parser.invalidateCache(dateOnly)
-	}
-
-	cachedUserStats := parser.getOrInitCachedStats(dateOnly, user)
-	if cachedUserStats != nil {
-		return cachedUserStats
-	}
 
 	cmd := exec.Command(parser.statsQueryBin, "--plain", dateOnly)
 	output, err := cmd.Output()
@@ -49,10 +32,6 @@ func (parser *StatsParser) Query(user string, byDate *time.Time) *Stats {
 		fmt.Println("Error executing command:", err)
 		return nil
 	}
-
-	parser.mu.Lock()
-	parser.lastQueryExecutionTime = time.Now()
-	parser.mu.Unlock()
 
 	scanner := bufio.NewScanner(strings.NewReader(string(output)))
 	for scanner.Scan() {
@@ -68,10 +47,6 @@ func (parser *StatsParser) Query(user string, byDate *time.Time) *Stats {
 				Up:   up,
 			}
 
-			parser.mu.Lock()
-			parser.dateToUserToStats[dateOnly][username] = stats
-			parser.mu.Unlock()
-
 			if username == user {
 				return stats
 			}
@@ -84,32 +59,4 @@ func (parser *StatsParser) Query(user string, byDate *time.Time) *Stats {
 	}
 
 	return nil
-}
-
-func (parser *StatsParser) getOrInitCachedStats(dateOnly string, user string) *Stats {
-	parser.mu.Lock()
-	defer parser.mu.Unlock()
-	if userCache, exists := parser.dateToUserToStats[dateOnly]; exists {
-		if stats, exists := userCache[user]; exists {
-			return stats
-		}
-	} else {
-		parser.dateToUserToStats[dateOnly] = make(map[string]*Stats)
-	}
-	return nil
-}
-
-func (parser *StatsParser) shouldInvalidateCache(dateOnly string) bool {
-	today := time.Now().Format(time.DateOnly)
-	if dateOnly != today {
-		return false
-	}
-
-	return time.Since(parser.lastQueryExecutionTime) > 5*time.Minute
-}
-
-func (parser *StatsParser) invalidateCache(dateOnly string) {
-	parser.mu.Lock()
-	defer parser.mu.Unlock()
-	delete(parser.dateToUserToStats, dateOnly)
 }
