@@ -100,7 +100,7 @@ func allHandler(ctx context.Context, b *bot.Bot, update *tgModels.Update) {
 
 	var builder strings.Builder
 	for _, stats := range allStats {
-		fmt.Fprintf(&builder, "%s\n%s\n\n", stats.User, stats.ToOneLineString())
+		fmt.Fprintf(&builder, "%s\n%s\n\n", stats.UserEmail, stats.ToOneLineString())
 	}
 
 	b.SendMessage(ctx, &bot.SendMessageParams{

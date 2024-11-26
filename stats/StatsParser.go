@@ -53,7 +53,7 @@ func (p *StatsParser) Query(byDate time.Time) []Stats {
 	}
 
 	sort.Slice(result, func(i, j int) bool {
-		return result[i].Down < result[j].Down
+		return result[i].DownBytes < result[j].DownBytes
 	})
 
 	return result
@@ -83,9 +83,9 @@ func (p *StatsParser) parseStatsLine(line string) *Stats {
 	down, _ := strconv.Atoi(fields[1])
 	up, _ := strconv.Atoi(fields[2])
 	stats := &Stats{
-		User: username,
-		Down: down,
-		Up:   up,
+		UserEmail: username,
+		DownBytes: down,
+		UpBytes:   up,
 	}
 
 	return stats
