@@ -4,6 +4,7 @@ import (
 	"bufio"
 	"fmt"
 	"os/exec"
+	"sort"
 	"strconv"
 	"strings"
 	"time"
@@ -50,6 +51,10 @@ func (p *StatsParser) Query(byDate time.Time) []Stats {
 		fmt.Println("Error reading command output:", err)
 		return result
 	}
+
+	sort.Slice(result, func(i, j int) bool {
+		return result[i].Down < result[j].Down
+	})
 
 	return result
 }
