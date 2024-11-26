@@ -90,27 +90,18 @@ func allHandler(ctx context.Context, b *bot.Bot, update *tgModels.Update) {
 		return
 	}
 
-	allUserEmails := userState.GetAllUsers()
-
-	userStatsSorted := make([]stats.Stats, 0, len(allUserEmails))
-	emptyStatsUsers := make([]string, 0)
-	for _, xrayUser := range allUserEmails {
-		stats := statsParser.QueryUser(xrayUser, time.Now())
-
-		if stats.Down == 0 && stats.Up == 0 {
-			emptyStatsUsers = append(emptyStatsUsers, stats.User)
-			continue
-		}
-
-		userStatsSorted = append(userStatsSorted, *stats)
+	date, err := parseDate(update.Message.Text)
+	if err != nil {
+		handleBadDateMessage(ctx, b, update)
+		return
 	}
+
+	allStats := statsParser.Query(date)
 
 	var builder strings.Builder
-	for _, stats := range userStatsSorted {
+	for _, stats := range allStats {
 		fmt.Fprintf(&builder, "%s\n%s\n\n", stats.User, stats.ToOneLineString())
 	}
-
-	fmt.Fprintln(&builder, "Empty stats users:", strings.Join(emptyStatsUsers, ", "))
 
 	b.SendMessage(ctx, &bot.SendMessageParams{
 		ChatID: update.Message.Chat.ID,
@@ -124,10 +115,32 @@ func queryHandler(ctx context.Context, b *bot.Bot, update *tgModels.Update) {
 		return
 	}
 
-	stats := statsParser.QueryUser(xrayUser, time.Now())
+	date, err := parseDate(update.Message.Text)
+	if err != nil {
+		handleBadDateMessage(ctx, b, update)
+		return
+	}
+
+	stats := statsParser.QueryUser(xrayUser, date)
 
 	b.SendMessage(ctx, &bot.SendMessageParams{
 		ChatID: update.Message.Chat.ID,
 		Text:   stats.ToString(),
 	})
+}
+
+func handleBadDateMessage(ctx context.Context, b *bot.Bot, update *tgModels.Update) {
+	b.SendMessage(ctx, &bot.SendMessageParams{
+		ChatID: update.Message.Chat.ID,
+		Text:   "Please provide a date in the format YYYY-MM-DD.",
+	})
+}
+
+func parseDate(messageText string) (time.Time, error) {
+	args := strings.Fields(messageText)
+	if len(args) < 2 {
+		return time.Now(), nil
+	}
+
+	return time.Parse(time.DateOnly, args[1])
 }
