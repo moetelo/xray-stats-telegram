@@ -26,6 +26,11 @@ const (
 	CommandQuery = "/query"
 )
 
+const (
+	HelpCommandAll   = "Get stats for every user for a specific date. Usage: /all [YYYY-MM-DD/empty for today]"
+	HelpCommandQuery = "Get your stats for a specific date. Usage: /query [YYYY-MM-DD/empty for today]"
+)
+
 func main() {
 	godotenv.Load()
 
@@ -49,7 +54,8 @@ func main() {
 		bot.WithDefaultHandler(defaultHandler),
 		bot.WithMessageTextHandler(CommandAll, bot.MatchTypePrefix, allHandler),
 		bot.WithMessageTextHandler(CommandQuery, bot.MatchTypePrefix, queryHandler),
-		bot.WithAllowedUpdates([]string{"message"}),
+		bot.WithAllowedUpdates([]string{"message", "callback_query"}),
+		bot.WithCallbackQueryDataHandler("", bot.MatchType(bot.HandlerTypeCallbackQueryData), allKeyboardHandler),
 	}
 
 	b, err := bot.New(botToken, opts...)
@@ -62,11 +68,15 @@ func main() {
 }
 
 func defaultHandler(ctx context.Context, b *bot.Bot, update *tgModels.Update) {
+	if update.Message == nil {
+		return
+	}
+
 	userId := update.Message.From.ID
 	if userState.IsAdmin(userId) {
 		b.SendMessage(ctx, &bot.SendMessageParams{
 			ChatID: update.Message.Chat.ID,
-			Text:   "Command:\n" + CommandAll + "\n" + CommandQuery,
+			Text:   "Commands:\n\n" + CommandAll + "\n" + HelpCommandAll + "\n\n" + CommandQuery + "\n" + HelpCommandQuery,
 		})
 		return
 	}
@@ -78,7 +88,7 @@ func defaultHandler(ctx context.Context, b *bot.Bot, update *tgModels.Update) {
 
 	b.SendMessage(ctx, &bot.SendMessageParams{
 		ChatID: update.Message.Chat.ID,
-		Text:   "Command:\n" + CommandQuery,
+		Text:   "Commands:\n" + CommandQuery + "\n" + HelpCommandQuery,
 	})
 }
 
@@ -98,15 +108,60 @@ func allHandler(ctx context.Context, b *bot.Bot, update *tgModels.Update) {
 
 	allStats := statsParser.Query(date)
 
+	b.SendMessage(ctx, &bot.SendMessageParams{
+		ChatID:      update.Message.Chat.ID,
+		Text:        statsArrayToMessageText(date, allStats),
+		ReplyMarkup: datePrevNextKeyboard(date),
+	})
+}
+
+func datePrevNextKeyboard(date time.Time) *tgModels.InlineKeyboardMarkup {
+	prevDate := date.AddDate(0, 0, -1)
+	nextDate := date.AddDate(0, 0, +1)
+
+	kb := &tgModels.InlineKeyboardMarkup{
+		InlineKeyboard: [][]tgModels.InlineKeyboardButton{
+			{
+				{Text: "⬅️", CallbackData: prevDate.Format(time.DateOnly)},
+				{Text: "➡️", CallbackData: nextDate.Format(time.DateOnly)},
+			},
+		},
+	}
+	fmt.Println(kb.InlineKeyboard)
+	return kb
+}
+
+func statsArrayToMessageText(date time.Time, allStats []stats.Stats) string {
 	var builder strings.Builder
+	builder.WriteString("Date: " + date.Format(time.DateOnly) + "\n\n")
 	for _, stats := range allStats {
 		fmt.Fprintf(&builder, "%s\n%s\n\n", stats.UserEmail, stats.ToOneLineString())
 	}
+	return builder.String()
+}
 
-	b.SendMessage(ctx, &bot.SendMessageParams{
-		ChatID: update.Message.Chat.ID,
-		Text:   builder.String(),
+func allKeyboardHandler(ctx context.Context, b *bot.Bot, update *tgModels.Update) {
+	date, err := time.Parse(time.DateOnly, update.CallbackQuery.Data)
+	if err != nil {
+		return
+	}
+
+	b.AnswerCallbackQuery(ctx, &bot.AnswerCallbackQueryParams{
+		CallbackQueryID: update.CallbackQuery.ID,
+		ShowAlert:       false,
 	})
+
+	allStats := statsParser.Query(date)
+
+	botMessage := update.CallbackQuery.Message.Message
+	_, err = b.EditMessageText(ctx, &bot.EditMessageTextParams{
+		ChatID:      botMessage.Chat.ID,
+		MessageID:   botMessage.ID,
+		Text:        statsArrayToMessageText(date, allStats),
+		ReplyMarkup: datePrevNextKeyboard(date),
+	})
+
+	fmt.Println(err)
 }
 
 func queryHandler(ctx context.Context, b *bot.Bot, update *tgModels.Update) {
