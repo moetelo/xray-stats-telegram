@@ -95,7 +95,7 @@ func allHandler(ctx context.Context, b *bot.Bot, update *tgModels.Update) {
 	userStatsSorted := make([]stats.Stats, 0, len(allUserEmails))
 	emptyStatsUsers := make([]string, 0)
 	for _, xrayUser := range allUserEmails {
-		stats := statsParser.Query(xrayUser, time.Now())
+		stats := statsParser.QueryUser(xrayUser, time.Now())
 
 		if stats.Down == 0 && stats.Up == 0 {
 			emptyStatsUsers = append(emptyStatsUsers, stats.User)
@@ -124,7 +124,7 @@ func queryHandler(ctx context.Context, b *bot.Bot, update *tgModels.Update) {
 		return
 	}
 
-	stats := statsParser.Query(xrayUser, time.Now())
+	stats := statsParser.QueryUser(xrayUser, time.Now())
 
 	b.SendMessage(ctx, &bot.SendMessageParams{
 		ChatID: update.Message.Chat.ID,
