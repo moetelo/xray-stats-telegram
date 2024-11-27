@@ -6,8 +6,8 @@ import (
 	"log"
 	"os"
 	"os/signal"
-	"strings"
 	"time"
+	"xray-stats-telegram/internal"
 	"xray-stats-telegram/models"
 	"xray-stats-telegram/stats"
 
@@ -22,8 +22,8 @@ var userState *models.UserState
 var statsParser *stats.StatsParser
 
 const (
-	CommandAll   = "/all"
-	CommandQuery = "/query"
+	CommandAdminAll = "/all"
+	CommandQuery    = "/query"
 )
 
 const (
@@ -42,7 +42,7 @@ func main() {
 	statsQueryBin := os.Getenv("STATS_QUERY_BIN")
 	statsParser = stats.New(statsQueryBin)
 
-	userState = models.NewStateFromConfigs(
+	userState = models.NewState(
 		"/usr/local/etc/xray-stats-telegram/admins",
 		"/usr/local/etc/xray-stats-telegram/users",
 	)
@@ -52,7 +52,7 @@ func main() {
 
 	opts := []bot.Option{
 		bot.WithDefaultHandler(defaultHandler),
-		bot.WithMessageTextHandler(CommandAll, bot.MatchTypePrefix, allHandler),
+		bot.WithMessageTextHandler(CommandAdminAll, bot.MatchTypePrefix, allHandler),
 		bot.WithMessageTextHandler(CommandQuery, bot.MatchTypePrefix, queryHandler),
 		bot.WithAllowedUpdates([]string{"message", "callback_query"}),
 		bot.WithCallbackQueryDataHandler("", bot.MatchType(bot.HandlerTypeCallbackQueryData), allKeyboardHandler),
@@ -76,7 +76,7 @@ func defaultHandler(ctx context.Context, b *bot.Bot, update *tgModels.Update) {
 	if userState.IsAdmin(userId) {
 		b.SendMessage(ctx, &bot.SendMessageParams{
 			ChatID: update.Message.Chat.ID,
-			Text:   "Commands:\n\n" + CommandAll + "\n" + HelpCommandAll + "\n\n" + CommandQuery + "\n" + HelpCommandQuery,
+			Text:   "Commands:\n\n" + CommandAdminAll + "\n" + HelpCommandAll + "\n\n" + CommandQuery + "\n" + HelpCommandQuery,
 		})
 		return
 	}
@@ -100,7 +100,7 @@ func allHandler(ctx context.Context, b *bot.Bot, update *tgModels.Update) {
 		return
 	}
 
-	date, err := parseDate(update.Message.Text)
+	date, err := internal.ParseDate(update.Message.Text)
 	if err != nil {
 		handleBadDateMessage(ctx, b, update)
 		return
@@ -110,7 +110,7 @@ func allHandler(ctx context.Context, b *bot.Bot, update *tgModels.Update) {
 
 	b.SendMessage(ctx, &bot.SendMessageParams{
 		ChatID:      update.Message.Chat.ID,
-		Text:        statsArrayToMessageText(date, allStats),
+		Text:        stats.StatsArrayToMessageText(date, allStats),
 		ReplyMarkup: datePrevNextKeyboard(date),
 	})
 }
@@ -131,33 +131,29 @@ func datePrevNextKeyboard(date time.Time) *tgModels.InlineKeyboardMarkup {
 	return kb
 }
 
-func statsArrayToMessageText(date time.Time, allStats []stats.Stats) string {
-	var builder strings.Builder
-	builder.WriteString("Date: " + date.Format(time.DateOnly) + "\n\n")
-	for _, stats := range allStats {
-		fmt.Fprintf(&builder, "%s\n%s\n\n", stats.UserEmail, stats.ToOneLineString())
-	}
-	return builder.String()
-}
-
 func allKeyboardHandler(ctx context.Context, b *bot.Bot, update *tgModels.Update) {
-	date, err := time.Parse(time.DateOnly, update.CallbackQuery.Data)
+	cq := update.CallbackQuery
+	date, err := time.Parse(time.DateOnly, cq.Data)
 	if err != nil {
 		return
 	}
 
+	if !userState.IsAdmin(cq.From.ID) {
+		return
+	}
+
 	b.AnswerCallbackQuery(ctx, &bot.AnswerCallbackQueryParams{
-		CallbackQueryID: update.CallbackQuery.ID,
+		CallbackQueryID: cq.ID,
 		ShowAlert:       false,
 	})
 
 	allStats := statsParser.Query(date)
 
-	botMessage := update.CallbackQuery.Message.Message
+	botMessage := cq.Message.Message
 	_, err = b.EditMessageText(ctx, &bot.EditMessageTextParams{
 		ChatID:      botMessage.Chat.ID,
 		MessageID:   botMessage.ID,
-		Text:        statsArrayToMessageText(date, allStats),
+		Text:        stats.StatsArrayToMessageText(date, allStats),
 		ReplyMarkup: datePrevNextKeyboard(date),
 	})
 
@@ -170,7 +166,7 @@ func queryHandler(ctx context.Context, b *bot.Bot, update *tgModels.Update) {
 		return
 	}
 
-	date, err := parseDate(update.Message.Text)
+	date, err := internal.ParseDate(update.Message.Text)
 	if err != nil {
 		handleBadDateMessage(ctx, b, update)
 		return
@@ -189,13 +185,4 @@ func handleBadDateMessage(ctx context.Context, b *bot.Bot, update *tgModels.Upda
 		ChatID: update.Message.Chat.ID,
 		Text:   "Please provide a date in the format YYYY-MM-DD.",
 	})
-}
-
-func parseDate(messageText string) (time.Time, error) {
-	args := strings.Fields(messageText)
-	if len(args) < 2 {
-		return time.Now(), nil
-	}
-
-	return time.Parse(time.DateOnly, args[1])
 }
