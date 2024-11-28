@@ -7,7 +7,7 @@ import (
 	"sort"
 	"strconv"
 	"strings"
-	"time"
+	"xray-stats-telegram/queryDate"
 )
 
 type StatsParser struct {
@@ -24,12 +24,10 @@ func New(statsQueryBin string) *StatsParser {
 	}
 }
 
-func (p *StatsParser) Query(byDate time.Time) []Stats {
+func (p *StatsParser) Query(queryDate queryDate.QueryDate) []Stats {
 	result := make([]Stats, 0, 5)
 
-	dateOnly := byDate.Format(time.DateOnly)
-
-	cmd := exec.Command(p.statsQueryBin, "--plain", dateOnly)
+	cmd := exec.Command(p.statsQueryBin, "--plain", queryDate.String())
 	output, err := cmd.Output()
 	if err != nil {
 		fmt.Println("Error executing command:", err)
@@ -59,10 +57,8 @@ func (p *StatsParser) Query(byDate time.Time) []Stats {
 	return result
 }
 
-func (p *StatsParser) QueryUser(user string, byDate time.Time) *Stats {
-	dateOnly := byDate.Format(time.DateOnly)
-
-	cmd := exec.Command(p.statsQueryBin, "--plain", dateOnly, user)
+func (p *StatsParser) QueryUser(user string, queryDate queryDate.QueryDate) *Stats {
+	cmd := exec.Command(p.statsQueryBin, "--plain", queryDate.String(), user)
 	output, err := cmd.Output()
 	if err != nil {
 		fmt.Println("Error executing command:", err)

@@ -6,9 +6,9 @@ import (
 	"log"
 	"os"
 	"os/signal"
-	"time"
-	"xray-stats-telegram/internal"
+	"strings"
 	"xray-stats-telegram/models"
+	"xray-stats-telegram/queryDate"
 	"xray-stats-telegram/stats"
 
 	"github.com/joho/godotenv"
@@ -51,7 +51,7 @@ func main() {
 	defer cancel()
 
 	opts := []bot.Option{
-		bot.WithDefaultHandler(defaultHandler),
+		bot.WithDefaultHandler(helpHandler),
 		bot.WithMessageTextHandler(CommandAdminAll, bot.MatchTypePrefix, allHandler),
 		bot.WithMessageTextHandler(CommandQuery, bot.MatchTypePrefix, queryHandler),
 		bot.WithAllowedUpdates([]string{"message", "callback_query"}),
@@ -67,7 +67,7 @@ func main() {
 	b.Start(ctx)
 }
 
-func defaultHandler(ctx context.Context, b *bot.Bot, update *tgModels.Update) {
+func helpHandler(ctx context.Context, b *bot.Bot, update *tgModels.Update) {
 	if update.Message == nil {
 		return
 	}
@@ -94,16 +94,21 @@ func defaultHandler(ctx context.Context, b *bot.Bot, update *tgModels.Update) {
 
 func allHandler(ctx context.Context, b *bot.Bot, update *tgModels.Update) {
 	userId := update.Message.From.ID
-	isAdmin := userState.IsAdmin(userId)
-
-	if !isAdmin {
+	if !userState.IsAdmin(userId) {
 		return
 	}
 
-	date, err := internal.ParseDate(update.Message.Text)
-	if err != nil {
-		handleBadDateMessage(ctx, b, update)
-		return
+	date := queryDate.Now()
+	args := strings.Fields(update.Message.Text)
+	if len(args) >= 2 {
+		possiblyDate := args[1]
+		parsedQdate, err := queryDate.Parse(possiblyDate)
+		if err != nil {
+			handleBadDateMessage(ctx, b, update)
+			return
+		}
+
+		date = parsedQdate
 	}
 
 	allStats := statsParser.Query(date)
@@ -115,37 +120,27 @@ func allHandler(ctx context.Context, b *bot.Bot, update *tgModels.Update) {
 	})
 }
 
-func datePrevNextKeyboard(date time.Time) *tgModels.InlineKeyboardMarkup {
-	prevDate := date.AddDate(0, 0, -1)
-	nextDate := date.AddDate(0, 0, +1)
-
-	kb := &tgModels.InlineKeyboardMarkup{
+func datePrevNextKeyboard(date queryDate.QueryDate) *tgModels.InlineKeyboardMarkup {
+	return &tgModels.InlineKeyboardMarkup{
 		InlineKeyboard: [][]tgModels.InlineKeyboardButton{
 			{
-				{Text: "⬅️", CallbackData: prevDate.Format(time.DateOnly)},
-				{Text: "➡️", CallbackData: nextDate.Format(time.DateOnly)},
+				{Text: "⬅️", CallbackData: date.Prev().String()},
+				{Text: "➡️", CallbackData: date.Next().String()},
 			},
 		},
 	}
-	fmt.Println(kb.InlineKeyboard)
-	return kb
 }
 
 func allKeyboardHandler(ctx context.Context, b *bot.Bot, update *tgModels.Update) {
 	cq := update.CallbackQuery
-	date, err := time.Parse(time.DateOnly, cq.Data)
-	if err != nil {
-		return
-	}
-
 	if !userState.IsAdmin(cq.From.ID) {
 		return
 	}
 
-	b.AnswerCallbackQuery(ctx, &bot.AnswerCallbackQueryParams{
-		CallbackQueryID: cq.ID,
-		ShowAlert:       false,
-	})
+	date, err := queryDate.Parse(cq.Data)
+	if err != nil {
+		return
+	}
 
 	allStats := statsParser.Query(date)
 
@@ -155,6 +150,10 @@ func allKeyboardHandler(ctx context.Context, b *bot.Bot, update *tgModels.Update
 		MessageID:   botMessage.ID,
 		Text:        stats.StatsArrayToMessageText(date, allStats),
 		ReplyMarkup: datePrevNextKeyboard(date),
+	})
+	b.AnswerCallbackQuery(ctx, &bot.AnswerCallbackQueryParams{
+		CallbackQueryID: cq.ID,
+		ShowAlert:       false,
 	})
 
 	fmt.Println(err)
@@ -166,7 +165,7 @@ func queryHandler(ctx context.Context, b *bot.Bot, update *tgModels.Update) {
 		return
 	}
 
-	date, err := internal.ParseDate(update.Message.Text)
+	date, err := queryDate.Parse(update.Message.Text)
 	if err != nil {
 		handleBadDateMessage(ctx, b, update)
 		return
@@ -183,6 +182,6 @@ func queryHandler(ctx context.Context, b *bot.Bot, update *tgModels.Update) {
 func handleBadDateMessage(ctx context.Context, b *bot.Bot, update *tgModels.Update) {
 	b.SendMessage(ctx, &bot.SendMessageParams{
 		ChatID: update.Message.Chat.ID,
-		Text:   "Please provide a date in the format YYYY-MM-DD.",
+		Text:   "Please provide a date in the format YYYY-MM-DD or YYYY-MM.",
 	})
 }
