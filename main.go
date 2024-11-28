@@ -98,17 +98,10 @@ func allHandler(ctx context.Context, b *bot.Bot, update *tgModels.Update) {
 		return
 	}
 
-	date := queryDate.Now()
-	args := strings.Fields(update.Message.Text)
-	if len(args) >= 2 {
-		possiblyDate := args[1]
-		parsedQdate, err := queryDate.Parse(possiblyDate)
-		if err != nil {
-			handleBadDateMessage(ctx, b, update)
-			return
-		}
-
-		date = parsedQdate
+	date, hasError := parseQueryDateFromMessage(update.Message.Text)
+	if hasError {
+		handleBadDateMessage(ctx, b, update)
+		return
 	}
 
 	allStats := statsParser.Query(date)
@@ -118,6 +111,21 @@ func allHandler(ctx context.Context, b *bot.Bot, update *tgModels.Update) {
 		Text:        stats.StatsArrayToMessageText(date, allStats),
 		ReplyMarkup: datePrevNextKeyboard(date),
 	})
+}
+
+func parseQueryDateFromMessage(messageText string) (queryDate.QueryDate, bool) {
+	date := queryDate.Now()
+	args := strings.Fields(messageText)
+	if len(args) >= 2 {
+		possiblyDate := args[1]
+		parsedQdate, err := queryDate.Parse(possiblyDate)
+		if err != nil {
+			return queryDate.QueryDate{}, true
+		}
+
+		date = parsedQdate
+	}
+	return date, false
 }
 
 func datePrevNextKeyboard(date queryDate.QueryDate) *tgModels.InlineKeyboardMarkup {
@@ -165,8 +173,8 @@ func queryHandler(ctx context.Context, b *bot.Bot, update *tgModels.Update) {
 		return
 	}
 
-	date, err := queryDate.Parse(update.Message.Text)
-	if err != nil {
+	date, hasError := parseQueryDateFromMessage(update.Message.Text)
+	if hasError {
 		handleBadDateMessage(ctx, b, update)
 		return
 	}
