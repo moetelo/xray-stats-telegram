@@ -109,7 +109,7 @@ func allHandler(ctx context.Context, b *bot.Bot, update *tgModels.Update) {
 	b.SendMessage(ctx, &bot.SendMessageParams{
 		ChatID:      update.Message.Chat.ID,
 		Text:        stats.StatsArrayToMessageText(date, allStats),
-		ReplyMarkup: datePrevNextKeyboard(date),
+		ReplyMarkup: dateKeyboard(date),
 	})
 }
 
@@ -128,11 +128,12 @@ func parseQueryDateFromMessage(messageText string) (queryDate.QueryDate, bool) {
 	return date, false
 }
 
-func datePrevNextKeyboard(date queryDate.QueryDate) *tgModels.InlineKeyboardMarkup {
+func dateKeyboard(date queryDate.QueryDate) *tgModels.InlineKeyboardMarkup {
 	return &tgModels.InlineKeyboardMarkup{
 		InlineKeyboard: [][]tgModels.InlineKeyboardButton{
 			{
 				{Text: "⬅️", CallbackData: date.Prev().String()},
+				{Text: "🔄", CallbackData: date.String()},
 				{Text: "➡️", CallbackData: date.Next().String()},
 			},
 		},
@@ -157,7 +158,7 @@ func allKeyboardHandler(ctx context.Context, b *bot.Bot, update *tgModels.Update
 		ChatID:      botMessage.Chat.ID,
 		MessageID:   botMessage.ID,
 		Text:        stats.StatsArrayToMessageText(date, allStats),
-		ReplyMarkup: datePrevNextKeyboard(date),
+		ReplyMarkup: dateKeyboard(date),
 	})
 	b.AnswerCallbackQuery(ctx, &bot.AnswerCallbackQueryParams{
 		CallbackQueryID: cq.ID,
