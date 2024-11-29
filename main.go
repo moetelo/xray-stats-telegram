@@ -55,7 +55,7 @@ func main() {
 		bot.WithMessageTextHandler(CommandAdminAll, bot.MatchTypePrefix, allHandler),
 		bot.WithMessageTextHandler(CommandQuery, bot.MatchTypePrefix, queryHandler),
 		bot.WithAllowedUpdates([]string{"message", "callback_query"}),
-		bot.WithCallbackQueryDataHandler("", bot.MatchType(bot.HandlerTypeCallbackQueryData), allKeyboardHandler),
+		bot.WithCallbackQueryDataHandler("", bot.MatchType(bot.HandlerTypeCallbackQueryData), dateKeyboardHandler),
 	}
 
 	b, err := bot.New(botToken, opts...)
@@ -140,24 +140,33 @@ func dateKeyboard(date queryDate.QueryDate) *tgModels.InlineKeyboardMarkup {
 	}
 }
 
-func allKeyboardHandler(ctx context.Context, b *bot.Bot, update *tgModels.Update) {
+func dateKeyboardHandler(ctx context.Context, b *bot.Bot, update *tgModels.Update) {
 	cq := update.CallbackQuery
-	if !userState.IsAdmin(cq.From.ID) {
-		return
-	}
 
 	date, err := queryDate.Parse(cq.Data)
 	if err != nil {
 		return
 	}
 
-	allStats := statsParser.Query(date)
+	var messageText string
+	userId := cq.From.ID
+	if userState.IsAdmin(userId) {
+		allStats := statsParser.Query(date)
+		messageText = stats.StatsArrayToMessageText(date, allStats)
+	} else {
+		xrayUser, isXrayUser := userState.GetXrayEmail(userId)
+		if !isXrayUser {
+			return
+		}
+		userStats := statsParser.QueryUser(xrayUser, date)
+		messageText = userStats.ToString()
+	}
 
 	botMessage := cq.Message.Message
 	_, err = b.EditMessageText(ctx, &bot.EditMessageTextParams{
 		ChatID:      botMessage.Chat.ID,
 		MessageID:   botMessage.ID,
-		Text:        stats.StatsArrayToMessageText(date, allStats),
+		Text:        messageText,
 		ReplyMarkup: dateKeyboard(date),
 	})
 	b.AnswerCallbackQuery(ctx, &bot.AnswerCallbackQueryParams{
@@ -183,8 +192,9 @@ func queryHandler(ctx context.Context, b *bot.Bot, update *tgModels.Update) {
 	stats := statsParser.QueryUser(xrayUser, date)
 
 	b.SendMessage(ctx, &bot.SendMessageParams{
-		ChatID: update.Message.Chat.ID,
-		Text:   stats.ToString(),
+		ChatID:      update.Message.Chat.ID,
+		Text:        stats.ToString(),
+		ReplyMarkup: dateKeyboard(date),
 	})
 }
 
