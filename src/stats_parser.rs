@@ -1,7 +1,7 @@
-use std::fs;
-use std::path::{Path, PathBuf};
 use crate::stats::Stats;
 use crate::traffic_kind::TrafficKind;
+use std::fs::{self};
+use std::path::{Path, PathBuf};
 
 use chrono::NaiveDate;
 
@@ -17,36 +17,44 @@ impl StatsParser {
         }
     }
 
-    pub fn query_user_by_date(&self, user: &str, date: NaiveDate) -> Stats {
-        let down = self.get_user_traffic(user, TrafficKind::Down, date);
-        let up = self.get_user_traffic(user, TrafficKind::Up, date);
+    pub fn query_user_by_date(&self, user: String, date: NaiveDate) -> Stats {
+        let down = self.get_user_traffic(&user, TrafficKind::Down, date);
+        let up = self.get_user_traffic(&user, TrafficKind::Up, date);
 
         Stats {
-            user: user.to_string(),
+            user,
             down,
             up,
         }
     }
 
-    fn get_user_traffic(&self, user: &str, traffic_kind: TrafficKind, date: NaiveDate) -> u64 {
+    fn get_user_traffic(&self, user: &String, traffic_kind: TrafficKind, date: NaiveDate) -> u64 {
         let iso_date = date.format("%Y-%m-%d").to_string();
 
-        let path = self.traffic_data_directory
+        let path = self
+            .traffic_data_directory
             .join(user)
             .join(traffic_kind.as_str())
             .join(iso_date);
 
-        fs::read_to_string(path).unwrap_or_default()
+        fs::read_to_string(path)
+            .unwrap_or_default()
             .lines()
             .filter_map(|line| line.parse::<u64>().ok())
             .sum()
     }
 
-    pub fn get_all_users(&self) -> Vec<String> {
-        self.traffic_data_directory.read_dir().unwrap()
+    pub fn get_all_users(&self) -> impl Iterator<Item = String> {
+        self.traffic_data_directory
+            .read_dir()
+            .expect("Failed to read traffic data directory")
             .filter_map(|entry| entry.ok())
-            .filter(|entry| entry.file_type().unwrap().is_dir())
+            .filter(|entry| {
+                entry
+                    .file_type()
+                    .map(|file_type| file_type.is_dir())
+                    .unwrap_or(false)
+            })
             .map(|entry| entry.file_name().into_string().unwrap())
-            .collect()
     }
 }

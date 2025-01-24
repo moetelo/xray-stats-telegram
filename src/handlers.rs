@@ -28,67 +28,67 @@ pub async fn answer(
         }
         UserCommand::Stats(string_date) => match date_util::date_or_today(string_date) {
             Ok(date) => {
-                let stats = stats_parser.query_user_by_date(xray_user.as_str(), date);
+                let stats = stats_parser.query_user_by_date(xray_user, date);
                 bot.send_message(user_id, stats.to_string()).await?;
                 return Ok(());
             }
             Err(_) => {
                 bot.send_message(user_id, "Invalid date format. Use YYYY-MM-DD.")
                     .await?;
-                return Ok(());
+                Ok(())
             }
         },
-    };
+    }
 }
 
 pub async fn answer_admin(
     stats_parser: StatsParser,
     bot: Bot,
     user_id: UserId,
-    cmd: AdminCommand,
+    command: AdminCommand,
 ) -> Result<(), teloxide::RequestError> {
-    match cmd {
+    match command {
         AdminCommand::All(string_date) => match date_util::date_or_today(string_date) {
-            Ok(date) => {
-                let all_stats = stats_parser
-                    .get_all_users()
-                    .iter()
-                    .map(|user| stats_parser.query_user_by_date(user, date))
-                    .collect::<Vec<Stats>>();
-
-                let empty_stats_users = all_stats
-                    .iter()
-                    .filter(|stats| stats.is_empty())
-                    .map(|stats| stats.user.clone())
-                    .collect::<Vec<String>>();
-
-                let non_empty_stats_users = all_stats
-                    .iter()
-                    .filter(|stats| !stats.is_empty())
-                    .collect::<Vec<&Stats>>();
-
-                let mut message = String::new();
-                for stats in non_empty_stats_users {
-                    message.push_str(&stats.user);
-                    message.push_str("\n");
-                    message.push_str(&stats.to_string());
-                    message.push_str("\n\n");
-                }
-
-                if !empty_stats_users.is_empty() {
-                    message.push_str("No data for the following users:\n");
-                    message.push_str(&empty_stats_users.join(", "));
-                }
-
-                bot.send_message(user_id, message).await?
-            }
             Err(_) => {
                 bot.send_message(user_id, "Invalid date format. Use YYYY-MM-DD.")
                     .await?;
                 return Ok(());
             }
+            Ok(date) => handle_all(stats_parser, bot, user_id, date).await?,
         },
     };
 
     Ok(())
+}
+
+async fn handle_all(
+    stats_parser: StatsParser,
+    bot: Bot,
+    user_id: UserId,
+    date: chrono::NaiveDate,
+) -> Result<Message, teloxide::RequestError> {
+    let all_stats: Vec<Stats> = stats_parser
+        .get_all_users()
+        .map(|user| stats_parser.query_user_by_date(user, date))
+        .collect();
+
+    let (empty_stats_users, non_empty_stats_users): (Vec<&Stats>, Vec<&Stats>) =
+        all_stats.iter().partition(|stats| stats.is_empty());
+
+    let mut message = non_empty_stats_users
+        .iter()
+        .map(|stats| format!("{}\n{}\n\n", stats.user, stats))
+        .collect::<String>();
+
+    let empty_stats_usernames: Vec<String> = empty_stats_users
+        .into_iter()
+        .map(|stats| stats.user.clone())
+        .collect();
+
+    if !empty_stats_usernames.is_empty() {
+        message.push_str("No data for the following users:\n");
+        message.push_str(&empty_stats_usernames.join(", "));
+    }
+
+    bot.send_message(user_id, message).await
 }

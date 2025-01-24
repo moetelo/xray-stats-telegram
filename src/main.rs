@@ -5,15 +5,12 @@ mod stats;
 mod stats_parser;
 mod traffic_kind;
 mod user_state;
+mod xray_stats_bot;
 
-use std::{fs, sync::Arc};
-use teloxide::{prelude::*, update_listeners};
+use std::fs;
+use teloxide::prelude::*;
 
-use crate::{
-    commands::{AdminCommand, UserCommand},
-    stats_parser::StatsParser,
-    user_state::UserState,
-};
+use crate::{stats_parser::StatsParser, user_state::UserState};
 
 #[tokio::main]
 async fn main() {
@@ -27,41 +24,13 @@ async fn main() {
 
     let stats_parser = StatsParser::new(traffic_data_dir);
 
-    let user_state = Arc::new(UserState::new(
+    let user_state = UserState::new(
         "/usr/local/etc/xray-stats-telegram/admins",
         "/usr/local/etc/xray-stats-telegram/users",
-    ));
-
-    let user_commands_endpoint =
-        dptree::filter_map(|user_id: UserId, user_state: Arc<UserState>| {
-            user_state.get_xray_email(user_id).cloned()
-        })
-        .filter_command::<UserCommand>()
-        .endpoint(handlers::answer);
-
-    let admin_commands_endpoint =
-        dptree::filter(|user_id: UserId, user_state: Arc<UserState>| user_state.is_admin(user_id))
-            .filter_command::<AdminCommand>()
-            .endpoint(handlers::answer_admin);
-
-    let handler = Update::filter_message()
-        .filter_map(|msg: Message| msg.chat.id.as_user())
-        .branch(user_commands_endpoint)
-        .branch(admin_commands_endpoint);
-
-    let ignore_update = |_upd| Box::pin(async {});
+    ).expect("Failed to create UserState, check /usr/local/etc/xray-stats-telegram/admins and /usr/local/etc/xray-stats-telegram/users");
     let bot = Bot::from_env();
-    Dispatcher::builder(bot.clone(), handler)
-        .dependencies(dptree::deps![user_state, stats_parser])
-        .default_handler(ignore_update)
-        .error_handler(LoggingErrorHandler::with_custom_text(
-            "An error has occurred in the dispatcher",
-        ))
-        .enable_ctrlc_handler()
-        .build()
-        .dispatch_with_listener(
-            update_listeners::polling_default(bot.clone()).await,
-            LoggingErrorHandler::with_custom_text("An error from the update listener"),
-        )
-        .await
+
+    let bot_instance =
+        xray_stats_bot::BotInstance::new(bot, user_state.into(), stats_parser.into());
+    bot_instance.run().await;
 }
