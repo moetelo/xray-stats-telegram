@@ -15,6 +15,11 @@ impl Stats {
 
 impl fmt::Display for Stats {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        write!(f, "↓ {} (mb) ↑ {} (mb)", self.down / 1024 / 1024, self.up / 1024 / 1024)
+        write!(
+            f,
+            "↓ {} (mb) ↑ {} (mb)",
+            self.down / 1024 / 1024,
+            self.up / 1024 / 1024
+        )
     }
 }

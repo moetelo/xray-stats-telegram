@@ -1,14 +1,19 @@
-mod user_state;
+mod commands;
+mod date_util;
+mod handlers;
 mod stats;
 mod stats_parser;
-mod date_util;
-mod commands;
 mod traffic_kind;
-mod handlers;
+mod user_state;
 
-use teloxide::{prelude::*, update_listeners};
-use crate::{user_state::UserState, stats_parser::StatsParser, commands::{AdminCommand, UserCommand}};
 use std::{fs, sync::Arc};
+use teloxide::{prelude::*, update_listeners};
+
+use crate::{
+    commands::{AdminCommand, UserCommand},
+    stats_parser::StatsParser,
+    user_state::UserState,
+};
 
 #[tokio::main]
 async fn main() {
@@ -27,19 +32,17 @@ async fn main() {
         "/usr/local/etc/xray-stats-telegram/users",
     ));
 
-    let user_commands_endpoint = dptree
-        ::filter_map(|user_id: UserId, user_state: Arc<UserState>| {
+    let user_commands_endpoint =
+        dptree::filter_map(|user_id: UserId, user_state: Arc<UserState>| {
             user_state.get_xray_email(user_id).cloned()
         })
         .filter_command::<UserCommand>()
         .endpoint(handlers::answer);
 
-    let admin_commands_endpoint = dptree
-        ::filter(|user_id: UserId, user_state: Arc<UserState>| {
-            user_state.is_admin(user_id)
-        })
-        .filter_command::<AdminCommand>()
-        .endpoint(handlers::answer_admin);
+    let admin_commands_endpoint =
+        dptree::filter(|user_id: UserId, user_state: Arc<UserState>| user_state.is_admin(user_id))
+            .filter_command::<AdminCommand>()
+            .endpoint(handlers::answer_admin);
 
     let handler = Update::filter_message()
         .filter_map(|msg: Message| msg.chat.id.as_user())
@@ -49,10 +52,7 @@ async fn main() {
     let ignore_update = |_upd| Box::pin(async {});
     let bot = Bot::from_env();
     Dispatcher::builder(bot.clone(), handler)
-        .dependencies(dptree::deps![
-            user_state,
-            stats_parser
-        ])
+        .dependencies(dptree::deps![user_state, stats_parser])
         .default_handler(ignore_update)
         .error_handler(LoggingErrorHandler::with_custom_text(
             "An error has occurred in the dispatcher",
