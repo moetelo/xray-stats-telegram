@@ -1,6 +1,7 @@
 mod commands;
 mod date_util;
 mod handlers;
+mod query_date;
 mod stats;
 mod stats_parser;
 mod traffic_kind;
@@ -9,6 +10,7 @@ mod xray_stats_bot;
 
 use std::fs;
 use teloxide::prelude::*;
+use xray_stats_bot::BotInstance;
 
 use crate::{stats_parser::StatsParser, user_state::UserState};
 
@@ -28,9 +30,8 @@ async fn main() {
         "/usr/local/etc/xray-stats-telegram/admins",
         "/usr/local/etc/xray-stats-telegram/users",
     ).expect("Failed to create UserState, check /usr/local/etc/xray-stats-telegram/admins and /usr/local/etc/xray-stats-telegram/users");
-    let bot = Bot::from_env();
 
-    let bot_instance =
-        xray_stats_bot::BotInstance::new(bot, user_state.into(), stats_parser.into());
-    bot_instance.run().await;
+    BotInstance::new(Bot::from_env(), user_state.into(), stats_parser.into())
+        .run()
+        .await;
 }

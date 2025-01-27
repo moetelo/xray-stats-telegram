@@ -1,9 +1,8 @@
+use crate::query_date::QueryDate;
 use crate::stats::Stats;
 use crate::traffic_kind::TrafficKind;
 use std::fs::{self};
 use std::path::{Path, PathBuf};
-
-use chrono::NaiveDate;
 
 #[derive(Debug, Clone)]
 pub struct StatsParser {
@@ -17,30 +16,29 @@ impl StatsParser {
         }
     }
 
-    pub fn query_user_by_date(&self, user: String, date: NaiveDate) -> Stats {
+    pub fn query_user_by_date(&self, user: String, date: &QueryDate) -> Stats {
         let down = self.get_user_traffic(&user, TrafficKind::Down, date);
         let up = self.get_user_traffic(&user, TrafficKind::Up, date);
 
-        Stats {
-            user,
-            down,
-            up,
-        }
+        Stats { user, down, up }
     }
 
-    fn get_user_traffic(&self, user: &String, traffic_kind: TrafficKind, date: NaiveDate) -> u64 {
-        let iso_date = date.format("%Y-%m-%d").to_string();
-
-        let path = self
+    fn get_user_traffic(&self, user: &String, traffic_kind: TrafficKind, date: &QueryDate) -> u64 {
+        let user_traffic_dir = self
             .traffic_data_directory
             .join(user)
-            .join(traffic_kind.as_str())
-            .join(iso_date);
+            .join(traffic_kind.to_string());
 
-        fs::read_to_string(path)
-            .unwrap_or_default()
-            .lines()
-            .filter_map(|line| line.parse::<u64>().ok())
+        date.queried_dates()
+            .iter()
+            .map(|date| user_traffic_dir.join(date))
+            .filter_map(|path| fs::read_to_string(path).ok())
+            .map(|content| {
+                content
+                    .lines()
+                    .filter_map(|line| line.parse::<u64>().ok())
+                    .sum::<u64>()
+            })
             .sum()
     }
 
