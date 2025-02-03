@@ -1,6 +1,6 @@
-use crate::query_date::QueryDate;
+use crate::stats::query_date::QueryDate;
+use crate::stats::traffic_kind::TrafficKind;
 use crate::stats::Stats;
-use crate::traffic_kind::TrafficKind;
 use std::fs::{self};
 use std::path::{Path, PathBuf};
 

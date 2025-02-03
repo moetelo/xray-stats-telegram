@@ -1,12 +1,13 @@
+use crate::{date, stats::stats::Stats};
 use crate::{
-    commands::{AdminCommand, UserCommand},
-    query_date::QueryDate,
-    stats_parser::StatsParser,
+    stats::QueryDate,
+    stats::StatsParser,
+    telegram::commands::{AdminCommand, UserCommand},
     user_state::UserState,
 };
-use crate::{date_util, stats::Stats};
 use std::sync::Arc;
-use teloxide::{prelude::*, utils::command::BotCommands};
+use teloxide::prelude::*;
+use teloxide::utils::command::BotCommands;
 
 pub async fn answer(
     bot: &Bot,
@@ -30,7 +31,7 @@ pub async fn answer(
 
             bot.send_message(user_id, help).await
         }
-        UserCommand::Stats(string_date) => match date_util::date_or_today(string_date) {
+        UserCommand::Stats(string_date) => match date::date_or_today(string_date) {
             Ok(date) => {
                 let stats = stats_parser.query_user_by_date(xray_user, &date);
                 bot.send_message(user_id, stats.to_string()).await
@@ -49,7 +50,7 @@ pub async fn answer_admin(
     command: AdminCommand,
 ) -> Result<(), teloxide::RequestError> {
     _ = match command {
-        AdminCommand::All(string_date) => match date_util::date_or_today(string_date) {
+        AdminCommand::All(string_date) => match date::date_or_today(string_date) {
             Err(_) => handle_invalid_date(bot, user_id).await,
             Ok(date) => handle_all(bot, stats_parser, user_id, &date).await,
         },

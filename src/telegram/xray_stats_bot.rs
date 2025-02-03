@@ -2,9 +2,9 @@ use std::sync::Arc;
 use teloxide::{prelude::*, update_listeners};
 
 use crate::{
-    commands::{AdminCommand, UserCommand},
-    handlers,
-    stats_parser::StatsParser,
+    stats::stats_parser::StatsParser,
+    telegram::commands::{AdminCommand, UserCommand},
+    telegram::handlers,
     user_state::UserState,
 };
 

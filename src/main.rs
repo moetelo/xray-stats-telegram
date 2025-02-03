@@ -1,18 +1,13 @@
-mod commands;
-mod date_util;
-mod handlers;
-mod query_date;
+mod date;
 mod stats;
-mod stats_parser;
-mod traffic_kind;
+mod telegram;
 mod user_state;
-mod xray_stats_bot;
 
+use crate::telegram::BotInstance;
 use std::fs;
 use teloxide::prelude::*;
-use xray_stats_bot::BotInstance;
 
-use crate::{stats_parser::StatsParser, user_state::UserState};
+use crate::{stats::StatsParser, user_state::UserState};
 
 #[tokio::main]
 async fn main() {
