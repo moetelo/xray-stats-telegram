@@ -96,5 +96,7 @@ async fn handle_all(
         message.push_str(&empty_stats_usernames.join(", "));
     }
 
-    bot.send_message(user_id, message).await
+    bot.send_message(user_id, message)
+        .reply_markup(crate::telegram::date_keyboard::make(date))
+        .await
 }

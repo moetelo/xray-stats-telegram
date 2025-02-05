@@ -1,4 +1,4 @@
-use chrono::Datelike;
+use chrono::{Datelike, Months};
 
 pub enum QueryDate {
     Full(chrono::NaiveDate),
@@ -26,6 +26,24 @@ impl QueryDate {
                 .filter_map(|day| self.with_day(day))
                 .map(|qd| qd.to_string())
                 .collect(),
+        }
+    }
+
+    pub fn prev(&self) -> QueryDate {
+        match self {
+            QueryDate::Full(date) => QueryDate::Full(date.pred_opt().unwrap()),
+            QueryDate::YearMonth(date) => {
+                QueryDate::YearMonth(date.checked_sub_months(Months::new(1)).unwrap())
+            }
+        }
+    }
+
+    pub fn next(&self) -> QueryDate {
+        match self {
+            QueryDate::Full(date) => QueryDate::Full(date.succ_opt().unwrap()),
+            QueryDate::YearMonth(date) => {
+                QueryDate::YearMonth(date.checked_add_months(Months::new(1)).unwrap())
+            }
         }
     }
 }
