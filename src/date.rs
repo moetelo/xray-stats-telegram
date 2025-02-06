@@ -1,4 +1,4 @@
-use crate::stats::query_date::QueryDate;
+use crate::stats::QueryDate;
 
 pub fn date_or_today(date: String) -> Result<QueryDate, chrono::ParseError> {
     match date.as_str() {

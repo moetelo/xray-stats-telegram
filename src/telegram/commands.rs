@@ -2,7 +2,7 @@ use teloxide::utils::command::BotCommands;
 
 #[derive(BotCommands, Clone)]
 #[command(rename_rule = "lowercase", description = "Supported commands:")]
-pub(crate) enum UserCommand {
+pub enum UserCommand {
     #[command(description = "display this text.")]
     Help,
     #[command(description = "get stats for date. `/stats 2024-09-01`")]

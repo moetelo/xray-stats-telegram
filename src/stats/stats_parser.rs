@@ -1,7 +1,7 @@
 use crate::stats::query_date::QueryDate;
 use crate::stats::traffic_kind::TrafficKind;
 use crate::stats::Stats;
-use std::fs::{self};
+use std::fs;
 use std::path::{Path, PathBuf};
 
 #[derive(Debug, Clone)]

@@ -5,7 +5,7 @@ mod user_state;
 
 use crate::telegram::BotInstance;
 use std::fs;
-use teloxide::prelude::*;
+use teloxide::prelude::Bot;
 
 use crate::{stats::StatsParser, user_state::UserState};
 
