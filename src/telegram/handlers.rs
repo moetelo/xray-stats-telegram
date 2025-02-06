@@ -1,13 +1,12 @@
-use crate::{date, stats::stats::Stats};
-use crate::{
-    stats::QueryDate,
-    stats::StatsParser,
-    telegram::commands::{AdminCommand, UserCommand},
-    user_state::UserState,
-};
+use crate::stats::{QueryDate, Stats, StatsParser};
+use crate::{date, user_state::UserState};
+use std::str::FromStr;
 use std::sync::Arc;
 use teloxide::prelude::*;
 use teloxide::utils::command::BotCommands;
+
+use super::commands::{AdminCommand, UserCommand};
+use super::date_keyboard;
 
 pub async fn answer(
     bot: &Bot,
@@ -59,6 +58,30 @@ pub async fn answer_admin(
     Ok(())
 }
 
+pub async fn answer_callback_query(
+    bot: &Bot,
+    query: CallbackQuery,
+    stats_parser: Arc<StatsParser>,
+) -> Result<(), teloxide::RequestError> {
+    let data = match query.data {
+        Some(data) => data,
+        None => return Ok(()),
+    };
+
+    let query_date = QueryDate::from_str(&data).expect("should be a date");
+    let message = query.message.expect("should have a message attached");
+
+    bot.edit_message_text(
+        message.chat().id,
+        message.id(),
+        report_all(stats_parser, &query_date),
+    )
+    .reply_markup(date_keyboard::make(&query_date))
+    .await?;
+
+    Ok(())
+}
+
 async fn handle_invalid_date(
     bot: &Bot,
     user_id: UserId,
@@ -73,6 +96,14 @@ async fn handle_all(
     user_id: UserId,
     date: &QueryDate,
 ) -> Result<Message, teloxide::RequestError> {
+    let message = report_all(stats_parser, date);
+
+    bot.send_message(user_id, message)
+        .reply_markup(date_keyboard::make(date))
+        .await
+}
+
+fn report_all(stats_parser: Arc<StatsParser>, date: &QueryDate) -> String {
     let all_stats: Vec<Stats> = stats_parser
         .get_all_users()
         .map(|user| stats_parser.query_user_by_date(user, date))
@@ -96,7 +127,5 @@ async fn handle_all(
         message.push_str(&empty_stats_usernames.join(", "));
     }
 
-    bot.send_message(user_id, message)
-        .reply_markup(crate::telegram::date_keyboard::make(date))
-        .await
+    message
 }

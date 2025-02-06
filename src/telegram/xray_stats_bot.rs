@@ -38,13 +38,20 @@ impl BotInstance {
             .filter_command::<AdminCommand>()
             .endpoint(handlers::answer_admin);
 
-        let handler = Update::filter_message()
-            .filter_map(|msg: Message| msg.chat.id.as_user())
+        let message_handler = Update::filter_message()
             .branch(user_commands_endpoint)
             .branch(admin_commands_endpoint);
 
+        let callback_query_handler =
+            Update::filter_callback_query().endpoint(handlers::answer_callback_query);
+
+        let combined_handler = dptree::entry()
+            .filter_map(|msg: Message| msg.chat.id.as_user())
+            .branch(message_handler)
+            .branch(callback_query_handler);
+
         let ignore_update = |_upd| Box::pin(async {});
-        Dispatcher::builder(self.bot.clone(), handler)
+        Dispatcher::builder(self.bot.clone(), combined_handler)
             .dependencies(dptree::deps![
                 self.user_state.clone(),
                 self.stats_parser.clone()
